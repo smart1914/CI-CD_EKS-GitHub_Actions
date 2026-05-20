@@ -73,11 +73,17 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: Deploy to EKS
+    - name: Force Kustomize Overrides and Deploy
       run: |
-        kubectl apply -k kustomize/base/
+        cd kustomize/base/
+        # Automatically swap the broken nodejs-app image string with our real built ECR image registry
+        kustomize edit set image 623035187793.dkr.ecr.us-east-1.amazonaws.com/nodejs-app=${{ steps.login-ecr.outputs.registry }}/calculator-app:latest
+        
+        # Apply the compiled kustomization live
+        kubectl apply -k .
         
     - name: Verify deployment
       run: |
         kubectl get deployments || true
         kubectl get pods || true
+        kubectl get svc || true
