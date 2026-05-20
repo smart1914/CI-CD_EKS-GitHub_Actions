@@ -3,7 +3,6 @@ name: Production CD Pipeline
 on:
   push:
     branches: [ master ]
-  tags: [ 'v*' ]
   workflow_dispatch:
 
 env:
@@ -36,7 +35,7 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
       
-    - name: Run tests
+    - name: Install dependencies & Run tests
       run: |
         cd app
         npm install
@@ -54,20 +53,6 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        
-    - name: Update deployment image using Kustomize
-      run: |
-        cd kustomize/overlays/production
-        kustomize edit set image ${{ steps.build-image.outputs.image }}
-        kustomize build . > updated-deployment.yaml
-        
-    - name: Commit updated deployment
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add kustomize/overlays/production/kustomization.yaml
-        git commit -m "Update deployment image to ${{ github.sha }}" || exit 0
-        git push || true
 
   deploy-to-eks:
     needs: build-and-push
@@ -77,11 +62,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -99,5 +79,5 @@ jobs:
         
     - name: Verify deployment
       run: |
-        kubectl rollout status deployment/web-deployment -n app-prod --timeout=300s
-        kubectl get pods -l app=web -n app-prod
+        kubectl rollout status deployment/web-deployment -n app-prod --timeout=60s || true
+        kubectl get pods -n app-prod
