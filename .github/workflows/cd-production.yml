@@ -14,6 +14,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
     
     steps:
     - name: Checkout code
@@ -73,14 +75,19 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: Force Kustomize Overrides and Deploy
+    - name: Hard-Replace Image String & Service Type
       run: |
         cd kustomize/base/
-        # Automatically swap the broken nodejs-app image string with our real built ECR image registry
-        kustomize edit set image 623035187793.dkr.ecr.us-east-1.amazonaws.com/nodejs-app=${{ steps.login-ecr.outputs.registry }}/calculator-app:latest
         
-        # Apply the compiled kustomization live
-        kubectl apply -k .
+        # 1. Force find any yaml file and change the image registry to our real ECR calculator-app path
+        sed -i 's|623035187793.dkr.ecr.us-east-1.amazonaws.com/nodejs-app:latest|623035187793.dkr.ecr.us-east-1.amazonaws.com/calculator-app:latest|g' *.yaml
+        
+        # 2. Convert ClusterIP to LoadBalancer dynamically inside the manifests
+        sed -i 's/type: ClusterIP/type: LoadBalancer/g' *.yaml
+        
+    - name: Deploy to EKS
+      run: |
+        kubectl apply -k kustomize/base/
         
     - name: Verify deployment
       run: |
