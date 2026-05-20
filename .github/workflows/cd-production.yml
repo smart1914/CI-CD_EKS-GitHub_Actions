@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-west-2
+  AWS_REGION: us-east-1
   ECR_REPOSITORY: calculator-app
-  EKS_CLUSTER_NAME: e2ecicd-cluster
+  EKS_CLUSTER_NAME: e2ecicd-eks-dev
   NODE_VERSION: 20
 
 jobs:
